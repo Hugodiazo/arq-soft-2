@@ -1,0 +1,23 @@
+# Archivos y carpetas generados por Go
+/bin/
+/pkg/
+/vendor/
+
+# Archivos de configuración del entorno
+.env
+
+# Archivos temporales de compilación
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Archivos de editor/IDE y sistema operativo
+.idea/
+*.DS_Store
+*.swp
+
+# Archivos generados por Go mod tidy
+go.sum
