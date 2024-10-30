@@ -1,0 +1,11 @@
+[
+    {
+      "id": "1",
+      "title": "Curso de Go",
+      "description": "Aprende Go desde cero",
+      "instructor": "Hugo",
+      "duration": 20,
+      "level": "beginner",
+      "availability": true
+    }
+  ]

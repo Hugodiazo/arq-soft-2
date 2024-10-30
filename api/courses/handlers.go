@@ -12,6 +12,41 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func indexCourseInSolr(course Course, id string) {
+	course.ID = primitive.ObjectID{} // Limpiamos el ID para evitar conflictos
+
+	// Construimos la URL de Solr
+	url := "http://localhost:8983/solr/courses/update?commit=true"
+	body, _ := json.Marshal(struct {
+		ID           string `json:"id"`
+		Title        string `json:"title"`
+		Description  string `json:"description"`
+		Instructor   string `json:"instructor"`
+		Duration     int    `json:"duration"`
+		Level        string `json:"level"`
+		Availability bool   `json:"availability"`
+	}{
+		ID:           id,
+		Title:        course.Title,
+		Description:  course.Description,
+		Instructor:   course.Instructor,
+		Duration:     course.Duration,
+		Level:        course.Level,
+		Availability: course.Availability,
+	})
+
+	resp, err := http.Post(url, "application/json", strings.NewReader(string(body)))
+	if err != nil {
+		log.Println("Error al indexar curso en Solr:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Println("Error en la respuesta de Solr:", resp.Status)
+	}
+}
+
 // Course representa un curso en la base de datos
 type Course struct {
 	ID           primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
@@ -36,15 +71,27 @@ func CreateCourse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Crear un nuevo ObjectID
+	course.ID = primitive.NewObjectID()
+
+	// Insertar el curso en MongoDB
 	_, err := db.MongoDB.Collection("courses").InsertOne(context.TODO(), course)
 	if err != nil {
 		http.Error(w, "Error al crear el curso", http.StatusInternalServerError)
 		return
 	}
 
+	// Convertir el ID a string para Solr
+	stringID := course.ID.Hex()
+	course.ID = primitive.ObjectID{} // Limpiamos el ObjectID si es necesario para Solr
+
+	// Indexar el curso en Solr
+	indexCourseInSolr(course, stringID)
+
 	json.NewEncoder(w).Encode(map[string]string{"message": "Curso creado con éxito"})
 }
 
+// GetCourses maneja la obtención de todos los cursos
 func GetCourses(w http.ResponseWriter, r *http.Request) {
 	cursor, err := db.MongoDB.Collection("courses").Find(context.TODO(), bson.M{})
 	if err != nil {
@@ -69,7 +116,6 @@ func GetCourses(w http.ResponseWriter, r *http.Request) {
 func GetCourseByID(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/courses/")
 
-	// Convertir el ID de string a ObjectID
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		http.Error(w, "ID inválido", http.StatusBadRequest)
@@ -88,58 +134,40 @@ func GetCourseByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(course)
 }
 
+// UpdateCourse maneja la actualización de un curso
 func UpdateCourse(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		return
 	}
 
-	id := strings.TrimPrefix(r.URL.Path, "/courses/")
-	log.Println("ID recibido:", id)
-
-	// Verificar que el curso existe usando string como filtro
-	var existingCourse Course
-	err := db.MongoDB.Collection("courses").FindOne(context.TODO(), bson.M{"_id": id}).Decode(&existingCourse)
+	id := strings.TrimPrefix(r.URL.Path, "/courses/update/")
+	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		log.Println("Error: No se encontró el curso con ese ID:", err)
-		http.Error(w, "Curso no encontrado", http.StatusNotFound)
+		http.Error(w, "ID inválido", http.StatusBadRequest)
 		return
 	}
-	log.Printf("Curso encontrado: %+v\n", existingCourse)
 
-	// Decodificar el cuerpo de la solicitud
 	var course Course
 	if err := json.NewDecoder(r.Body).Decode(&course); err != nil {
 		http.Error(w, "Solicitud inválida", http.StatusBadRequest)
 		return
 	}
 
-	// Actualizar los datos en MongoDB
-	filter := bson.M{"_id": id}
-	update := bson.M{
-		"$set": bson.M{
-			"title":        course.Title,
-			"description":  course.Description,
-			"instructor":   course.Instructor,
-			"duration":     course.Duration,
-			"level":        course.Level,
-			"availability": course.Availability,
-		},
-	}
+	filter := bson.M{"_id": objectID}
+	update := bson.M{"$set": course}
 
 	result, err := db.MongoDB.Collection("courses").UpdateOne(context.TODO(), filter, update)
-	if err != nil {
-		log.Println("Error al actualizar curso:", err)
+	if err != nil || result.MatchedCount == 0 {
 		http.Error(w, "Error al actualizar curso", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Matched: %d, Modified: %d\n", result.MatchedCount, result.ModifiedCount)
+	// Convertir el ID a string para Solr
+	stringID := objectID.Hex()
 
-	if result.MatchedCount == 0 {
-		http.Error(w, "Curso no encontrado", http.StatusNotFound)
-		return
-	}
+	// Actualizar el curso en Solr
+	indexCourseInSolr(course, stringID)
 
 	json.NewEncoder(w).Encode(map[string]string{"message": "Curso actualizado con éxito"})
 }
@@ -185,6 +213,7 @@ func GetEnrollments(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error al obtener inscripciones", http.StatusInternalServerError)
 		return
 	}
+
 	var enrollments []Enrollment
 	if err = cursor.All(context.TODO(), &enrollments); err != nil {
 		http.Error(w, "Error al decodificar inscripciones", http.StatusInternalServerError)
