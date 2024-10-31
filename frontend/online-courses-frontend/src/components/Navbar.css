@@ -1,0 +1,57 @@
+/* src/components/Navbar.css */
+
+/* Contenedor de navegación */
+nav {
+    background-color: #1a73e8;
+    padding: 10px 0; /* Espaciado superior e inferior */
+    color: #fff;
+    display: flex;
+    justify-content: center; /* Centra los elementos horizontalmente */
+  }
+  
+  /* Lista de navegación */
+  nav ul {
+    list-style: none;
+    display: flex;
+    gap: 40px; /* Espacio entre cada elemento del menú */
+    margin: 0;
+    padding: 0;
+    justify-content: center; /* Asegura que los elementos estén centrados */
+    align-items: center; /* Alinea verticalmente los elementos */
+  }
+  
+  /* Estilo de los enlaces */
+  nav a {
+    color: #fff;
+    font-weight: bold;
+    text-decoration: none;
+    font-size: 16px; /* Tamaño de fuente */
+  }
+  
+  nav a:hover {
+    color: rgb(141, 137, 147);
+  }
+  
+  /* Botón de cerrar sesión */
+  nav .logout-button {
+    background-color: #cf291e;
+    color: white;
+    border: none;
+    padding: 6px 13px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+    margin-left: 40px;
+  }
+  
+  nav .logout-button:hover {
+    background-color: #aa1919;
+  }
+
+/* Estilo para el mensaje de cierre de sesión */
+.logout-message {
+    color: #f44336;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 10px;
+  }

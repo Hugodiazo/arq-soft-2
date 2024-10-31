@@ -1,0 +1,54 @@
+/* src/components/CourseDetail.css */
+
+.course-detail {
+    max-width: 800px;
+    margin: 50px auto;
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+  }
+  
+  .course-detail h2 {
+    font-size: 2rem;
+    color: #1a73e8;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  
+  .course-detail p {
+    font-size: 1rem;
+    color: #333;
+    margin-bottom: 15px;
+  }
+  
+  .course-detail p strong {
+    font-weight: bold;
+  }
+  
+  .course-detail button {
+    display: block;
+    width: 100%;
+    background-color: #1a73e8;
+    color: #fff;
+    border: none;
+    padding: 12px;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    text-align: center;
+    transition: background-color 0.3s;
+    margin-top: 20px;
+  }
+  
+  .course-detail button:hover {
+    background-color: #155ab0;
+  }
+  
+  .course-detail .course-instructor,
+  .course-detail .course-duration {
+    font-size: 0.9rem;
+    color: #666;
+  }

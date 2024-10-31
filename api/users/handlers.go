@@ -35,15 +35,22 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Asegúrate de que el nombre y el rol no estén vacíos
+	if user.Name == "" || user.Role == "" {
+		http.Error(w, "El nombre y el rol son obligatorios", http.StatusBadRequest)
+		return
+	}
+
+	// encriptar contra
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		http.Error(w, "Error al encriptar la contraseña", http.StatusInternalServerError)
 		return
 	}
 
+	// Guarda la contraseña encriptada en la base de datos
 	_, err = db.DB.Exec("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
 		user.Name, user.Email, string(hashedPassword), user.Role)
-
 	if err != nil {
 		log.Println("Error al registrar usuario:", err)
 		http.Error(w, "Error al registrar usuario", http.StatusInternalServerError)
@@ -72,10 +79,11 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = bcrypt.CompareHashAndPassword([]byte(storedPassword), []byte(creds.Password)); err != nil {
-		http.Error(w, "Contraseña incorrecta", http.StatusUnauthorized)
+		http.Error(w, "Credenciales incorrectas", http.StatusUnauthorized)
 		return
 	}
 
+	// Generar el token JWT
 	expirationTime := time.Now().Add(24 * time.Hour)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"email": creds.Email,
@@ -88,13 +96,15 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Establecer la cookie del token
 	http.SetCookie(w, &http.Cookie{
 		Name:    "token",
 		Value:   tokenString,
 		Expires: expirationTime,
 	})
 
-	json.NewEncoder(w).Encode(map[string]string{"message": "Inicio de sesión exitoso"})
+	// Responder con el token como JSON
+	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
 }
 
 func GetAllUsers(w http.ResponseWriter, r *http.Request) {

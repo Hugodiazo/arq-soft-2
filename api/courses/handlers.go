@@ -222,3 +222,25 @@ func GetEnrollments(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(enrollments)
 }
+
+// DeleteCourse maneja la eliminación de un curso por ID
+func DeleteCourse(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/courses/delete/")
+
+	// Convertir el ID de string a ObjectId
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		http.Error(w, "ID inválido", http.StatusBadRequest)
+		return
+	}
+
+	// Intentar eliminar el curso de la base de datos
+	filter := bson.M{"_id": objectID}
+	result, err := db.MongoDB.Collection("courses").DeleteOne(context.TODO(), filter)
+	if err != nil || result.DeletedCount == 0 {
+		http.Error(w, "Curso no encontrado o no pudo ser eliminado", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Curso eliminado con éxito"})
+}
