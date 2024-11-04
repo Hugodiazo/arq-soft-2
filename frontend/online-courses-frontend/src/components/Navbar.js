@@ -22,7 +22,6 @@ function Navbar() {
     <nav>
       <ul>
         <li><Link to="/">Home</Link></li>
-        <li><Link to="/search">Buscar Cursos</Link></li>
         <li><Link to="/mis-cursos">Mis Cursos</Link></li>
         <li><Link to="/login">Login</Link></li>
         <li><Link to="/register">Registro</Link></li>
