@@ -1,26 +1,45 @@
+// src/App.js
 import React from 'react';
-import './App.css';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import MyCourses from './pages/MyCourses';
 import Login from './components/Login';
 import Register from './components/Register';
-
 import CourseDetail from './components/CourseDetail';
+import { AuthProvider } from './context/AuthContext'; // Asegúrate de importar y envolver con AuthProvider
+import PrivateRoute from './components/PrivateRoute'; // Importa el PrivateRoute
 
 function App() {
   return (
-    <Router>
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/courses/:id" element={<CourseDetail />} />
-        <Route path="/mis-cursos" element={<MyCourses />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          {/* Rutas protegidas */}
+          <Route
+            path="/courses/:id"
+            element={
+              <PrivateRoute>
+                <CourseDetail />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/mis-cursos"
+            element={
+              <PrivateRoute>
+                <MyCourses />
+              </PrivateRoute>
+            }
+          />
+          {/* Rutas públicas */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 

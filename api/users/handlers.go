@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -22,26 +23,43 @@ type Credentials struct {
 
 // User representa la estructura del usuario
 type Users struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
 }
 
 func RegisterUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
 	var user User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		http.Error(w, "Solicitud inválida", http.StatusBadRequest)
 		return
 	}
 
-	// Asegúrate de que el nombre y el rol no estén vacíos
-	if user.Name == "" || user.Role == "" {
-		http.Error(w, "El nombre y el rol son obligatorios", http.StatusBadRequest)
+	// Validar que todos los campos estén completos
+	if user.Name == "" || user.Email == "" || user.Password == "" {
+		http.Error(w, "Todos los campos son obligatorios", http.StatusBadRequest)
 		return
 	}
 
-	// encriptar contra
+	// Validar el formato del correo electrónico
+	emailRegex := `^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`
+	if !regexp.MustCompile(emailRegex).MatchString(user.Email) {
+		http.Error(w, "Formato de correo electrónico inválido", http.StatusBadRequest)
+		return
+	}
+
+	// Asignar un rol por defecto si no se proporciona
+	if user.Role == "" {
+		user.Role = "user"
+	}
+
+	// Encriptar la contraseña
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		http.Error(w, "Error al encriptar la contraseña", http.StatusInternalServerError)

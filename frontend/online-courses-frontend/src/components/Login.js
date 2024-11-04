@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+// src/components/Login.js
+import React, { useState, useContext } from 'react';
+import AuthContext from '../context/AuthContext';
 import './Login.css';
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState('error');
+  const { login } = useContext(AuthContext);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -17,26 +19,22 @@ function Login() {
       .then((response) => response.json())
       .then((data) => {
         if (data.token) {
-          localStorage.setItem('token', data.token);
-          console.log("Token guardado:", data.token);
+          login(data.token); // Actualiza el contexto de autenticación
           setMessage('Inicio de sesión exitoso');
-          setMessageType('success');
         } else {
           setMessage('Credenciales incorrectas');
-          setMessageType('error');
         }
       })
       .catch((error) => {
         console.error('Error al iniciar sesión:', error);
         setMessage('Error al conectar con el servidor');
-        setMessageType('error');
       });
   };
 
   return (
     <div className="login-form">
       <h2>Iniciar Sesión</h2>
-      <p className={`login-message ${messageType}`}>{message}</p>
+      <p>{message}</p>
       <form onSubmit={handleSubmit}>
         <input
           type="email"
