@@ -1,4 +1,3 @@
-// src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar';
@@ -7,8 +6,9 @@ import MyCourses from './pages/MyCourses';
 import Login from './components/Login';
 import Register from './components/Register';
 import CourseDetail from './components/CourseDetail';
-import { AuthProvider } from './context/AuthContext'; // Asegúrate de importar y envolver con AuthProvider
-import PrivateRoute from './components/PrivateRoute'; // Importa el PrivateRoute
+import Search from './components/Search'; // Importa el componente de búsqueda
+import { AuthProvider } from './context/AuthContext';
+import PrivateRoute from './components/PrivateRoute';
 
 function App() {
   return (
@@ -17,24 +17,9 @@ function App() {
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
-          {/* Rutas protegidas */}
-          <Route
-            path="/courses/:id"
-            element={
-              <PrivateRoute>
-                <CourseDetail />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/mis-cursos"
-            element={
-              <PrivateRoute>
-                <MyCourses />
-              </PrivateRoute>
-            }
-          />
-          {/* Rutas públicas */}
+          <Route path="/search" element={<Search />} /> 
+          <Route path="/courses/:id" element={<PrivateRoute><CourseDetail /></PrivateRoute>} />
+          <Route path="/mis-cursos" element={<PrivateRoute><MyCourses /></PrivateRoute>} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Routes>

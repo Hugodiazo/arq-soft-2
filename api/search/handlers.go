@@ -19,7 +19,6 @@ type Course struct {
 }
 
 // SearchCourses maneja la búsqueda de cursos utilizando Solr
-// SearchCourses maneja la búsqueda de cursos utilizando Solr
 func SearchCourses(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)

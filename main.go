@@ -29,6 +29,9 @@ func main() {
 	db.ConnectDB()
 	db.ConnectMongoDB()
 
+	// Llamar a la función para indexar todos los cursos en Solr
+	courses.IndexAllCoursesInSolr()
+
 	// Crear un nuevo mux
 	mux := http.NewServeMux()
 

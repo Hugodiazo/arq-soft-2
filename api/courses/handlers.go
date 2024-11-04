@@ -54,29 +54,37 @@ func getUserIDFromToken(r *http.Request) (int, error) {
 	return 0, fmt.Errorf("no se pudieron obtener las reclamaciones del token")
 }
 
+// Course representa un curso en la base de datos
+type Course struct {
+	ID           primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Title        string             `json:"title"`
+	Description  string             `json:"description"`
+	Instructor   string             `json:"instructor"`
+	Duration     int                `json:"duration"`
+	Level        string             `json:"level"`
+	Availability bool               `json:"availability"`
+}
+
 func indexCourseInSolr(course Course, id string) {
-	course.ID = primitive.ObjectID{} // Limpiamos el ID para evitar conflictos
-
 	// Construimos la URL de Solr
-	url := "http://localhost:8983/solr/courses/update?commit=true"
-	body, _ := json.Marshal(struct {
-		ID           string `json:"id"`
-		Title        string `json:"title"`
-		Description  string `json:"description"`
-		Instructor   string `json:"instructor"`
-		Duration     int    `json:"duration"`
-		Level        string `json:"level"`
-		Availability bool   `json:"availability"`
-	}{
-		ID:           id,
-		Title:        course.Title,
-		Description:  course.Description,
-		Instructor:   course.Instructor,
-		Duration:     course.Duration,
-		Level:        course.Level,
-		Availability: course.Availability,
-	})
+	url := "http://localhost:8983/solr/courses/update/json/docs?commit=true"
 
+	// Construir el JSON del curso
+	body, err := json.Marshal(map[string]interface{}{
+		"id":           id,
+		"title":        course.Title,
+		"description":  course.Description,
+		"instructor":   course.Instructor,
+		"duration":     course.Duration,
+		"level":        course.Level,
+		"availability": course.Availability,
+	})
+	if err != nil {
+		log.Println("Error al crear el JSON para Solr:", err)
+		return
+	}
+
+	// Enviar la solicitud POST a Solr
 	resp, err := http.Post(url, "application/json", strings.NewReader(string(body)))
 	if err != nil {
 		log.Println("Error al indexar curso en Solr:", err)
@@ -89,15 +97,29 @@ func indexCourseInSolr(course Course, id string) {
 	}
 }
 
-// Course representa un curso en la base de datos
-type Course struct {
-	ID           primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	Title        string             `json:"title"`
-	Description  string             `json:"description"`
-	Instructor   string             `json:"instructor"`
-	Duration     int                `json:"duration"`
-	Level        string             `json:"level"`
-	Availability bool               `json:"availability"`
+func IndexAllCoursesInSolr() {
+	cursor, err := db.MongoDB.Collection("courses").Find(context.TODO(), bson.M{})
+	if err != nil {
+		log.Println("Error al obtener cursos de MongoDB:", err)
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	for cursor.Next(context.TODO()) {
+		var course Course
+		if err := cursor.Decode(&course); err != nil {
+			log.Println("Error al decodificar curso:", err)
+			continue
+		}
+
+		// Convierte el ObjectID a una cadena para Solr
+		stringID := course.ID.Hex()
+
+		// Indexa el curso en Solr
+		indexCourseInSolr(course, stringID)
+	}
+
+	log.Println("Todos los cursos se han indexado en Solr")
 }
 
 // CreateCourse maneja la creación de un curso

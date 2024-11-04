@@ -1,0 +1,16 @@
+/* src/components/Search.css */
+.search {
+    text-align: center;
+    padding: 20px;
+  }
+  
+  .search-results {
+    margin-top: 20px;
+  }
+  
+  .course-item {
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+  }
