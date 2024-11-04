@@ -50,11 +50,12 @@ func main() {
 			http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		}
 	})
-	mux.HandleFunc("/courses/", courses.GetCourseByID)       // GET /courses/{id}
-	mux.HandleFunc("/courses/update/", courses.UpdateCourse) // PUT /courses/update/{id}
-	mux.HandleFunc("/courses/enroll", courses.EnrollUser)    // POST /courses/enroll
-	mux.HandleFunc("/enrollments", courses.GetEnrollments)   // GET /enrollments
-	mux.HandleFunc("/search", search.SearchCourses)          // GET /search?q=<query>
+	mux.HandleFunc("/courses/", courses.GetCourseByID)        // GET /courses/{id}
+	mux.HandleFunc("/courses/update/", courses.UpdateCourse)  // PUT /courses/update/{id}
+	mux.HandleFunc("/courses/enroll", courses.EnrollUser)     // POST /courses/enroll
+	mux.HandleFunc("/enrollments", courses.GetEnrollments)    // GET /enrollments
+	mux.HandleFunc("/search", search.SearchCourses)           // GET /search?q=<query>
+	mux.HandleFunc("/courses/unenroll", courses.UnenrollUser) // DELETE /courses/Unenroll
 
 	// Usar el middleware para habilitar CORS
 	handler := enableCors(mux)

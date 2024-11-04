@@ -5,11 +5,10 @@ function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState('error'); // Nuevo estado para el tipo de mensaje
+  const [messageType, setMessageType] = useState('error');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Llamada al backend para el login
     fetch('http://localhost:8080/users/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -18,26 +17,26 @@ function Login() {
       .then((response) => response.json())
       .then((data) => {
         if (data.token) {
-          // Guarda el token y muestra un mensaje de éxito
           localStorage.setItem('token', data.token);
+          console.log("Token guardado:", data.token);
           setMessage('Inicio de sesión exitoso');
-          setMessageType('success'); // Cambia el tipo de mensaje a "success"
+          setMessageType('success');
         } else {
           setMessage('Credenciales incorrectas');
-          setMessageType('error'); // Mantiene el tipo de mensaje como "error"
+          setMessageType('error');
         }
       })
       .catch((error) => {
         console.error('Error al iniciar sesión:', error);
         setMessage('Error al conectar con el servidor');
-        setMessageType('error'); // Mantiene el tipo de mensaje como "error"
+        setMessageType('error');
       });
   };
 
   return (
     <div className="login-form">
       <h2>Iniciar Sesión</h2>
-      <p className={`login-message ${messageType}`}>{message}</p> {/* Añade la clase según el tipo de mensaje */}
+      <p className={`login-message ${messageType}`}>{message}</p>
       <form onSubmit={handleSubmit}>
         <input
           type="email"

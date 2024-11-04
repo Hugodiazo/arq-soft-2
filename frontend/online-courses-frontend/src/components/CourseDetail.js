@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import API_URL from '../config';
 import './CourseDetail.css';
 
 const CourseDetail = () => {
-  const { id } = useParams(); // Obtener el ID del curso desde la URL
+  const { id } = useParams();
   const [course, setCourse] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCourse = async () => {
       try {
         const response = await fetch(`${API_URL}/courses/${id}`);
+        if (!response.ok) {
+          throw new Error('Error al obtener detalles del curso');
+        }
         const data = await response.json();
         setCourse(data);
       } catch (error) {
@@ -23,18 +27,24 @@ const CourseDetail = () => {
 
   const handleEnrollment = async () => {
     try {
-      const token = localStorage.getItem('token'); // Asegúrate de que el usuario esté autenticado
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Debes iniciar sesión para inscribirte en un curso');
+        return;
+      }
+
       const response = await fetch(`${API_URL}/courses/enroll`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`, // Usar el token de autenticación
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ course_id: id }), // Enviar el ID del curso
+        body: JSON.stringify({ course_id: id }),
       });
 
       if (response.ok) {
         alert('¡Inscripción exitosa!');
+        navigate('/mis-cursos');
       } else {
         alert('Error al inscribirse en el curso');
       }

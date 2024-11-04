@@ -3,14 +3,56 @@ package courses
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/hugodiazo/arq-soft-2/db"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+var jwtKey = []byte("my_secret_key")
+
+// getUserIDFromToken extrae el ID del usuario del token JWT
+func getUserIDFromToken(r *http.Request) (int, error) {
+	authHeader := r.Header.Get("Authorization")
+	log.Println("Encabezado Authorization:", authHeader) // Depurar el encabezado
+
+	if authHeader == "" {
+		return 0, fmt.Errorf("token no proporcionado")
+	}
+
+	// Extraer el token
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
+	// Parsear el token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("método de firma inesperado: %v", token.Header["alg"])
+		}
+		return jwtKey, nil
+	})
+
+	if err != nil || !token.Valid {
+		log.Println("Error al parsear o token inválido:", err)
+		return 0, fmt.Errorf("token inválido")
+	}
+
+	// Extraer las reclamaciones del token
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		userID, ok := claims["user_id"].(float64)
+		if !ok {
+			return 0, fmt.Errorf("ID de usuario no encontrado en el token")
+		}
+		log.Println("ID de usuario extraído:", int(userID))
+		return int(userID), nil
+	}
+
+	return 0, fmt.Errorf("no se pudieron obtener las reclamaciones del token")
+}
 
 func indexCourseInSolr(course Course, id string) {
 	course.ID = primitive.ObjectID{} // Limpiamos el ID para evitar conflictos
@@ -186,13 +228,22 @@ func EnrollUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, err := getUserIDFromToken(r)
+	if err != nil {
+		http.Error(w, "No se pudo obtener el ID del usuario", http.StatusUnauthorized)
+		return
+	}
+
 	var enrollment Enrollment
 	if err := json.NewDecoder(r.Body).Decode(&enrollment); err != nil {
 		http.Error(w, "Solicitud inválida", http.StatusBadRequest)
 		return
 	}
 
-	_, err := db.MongoDB.Collection("enrollments").InsertOne(context.TODO(), enrollment)
+	enrollment.UserID = userID
+	enrollment.Status = "active"
+
+	_, err = db.MongoDB.Collection("enrollments").InsertOne(context.TODO(), enrollment)
 	if err != nil {
 		http.Error(w, "Error al inscribir usuario", http.StatusInternalServerError)
 		return
@@ -203,24 +254,49 @@ func EnrollUser(w http.ResponseWriter, r *http.Request) {
 
 // GetEnrollments obtiene todas las inscripciones
 func GetEnrollments(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+	userID, err := getUserIDFromToken(r)
+	if err != nil {
+		http.Error(w, "No se pudo obtener el ID del usuario", http.StatusUnauthorized)
 		return
 	}
 
-	cursor, err := db.MongoDB.Collection("enrollments").Find(context.TODO(), bson.M{})
+	// Buscar las inscripciones del usuario en la base de datos
+	cursor, err := db.MongoDB.Collection("enrollments").Find(context.TODO(), bson.M{"user_id": userID})
 	if err != nil {
 		http.Error(w, "Error al obtener inscripciones", http.StatusInternalServerError)
 		return
 	}
+	defer cursor.Close(context.TODO())
 
-	var enrollments []Enrollment
-	if err = cursor.All(context.TODO(), &enrollments); err != nil {
-		http.Error(w, "Error al decodificar inscripciones", http.StatusInternalServerError)
+	var enrolledCourses []Course
+	for cursor.Next(context.TODO()) {
+		var enrollment Enrollment
+		if err := cursor.Decode(&enrollment); err != nil {
+			continue
+		}
+
+		// Convertir el course_id de string a ObjectID
+		objectID, err := primitive.ObjectIDFromHex(enrollment.CourseID)
+		if err != nil {
+			continue
+		}
+
+		// Buscar los detalles del curso usando el ObjectID
+		var course Course
+		err = db.MongoDB.Collection("courses").FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&course)
+		if err != nil {
+			continue
+		}
+		enrolledCourses = append(enrolledCourses, course)
+	}
+
+	// Verificar si no se encontraron cursos inscritos
+	if len(enrolledCourses) == 0 {
+		json.NewEncoder(w).Encode(map[string]string{"message": "No estás inscrito en ningún curso."})
 		return
 	}
 
-	json.NewEncoder(w).Encode(enrollments)
+	json.NewEncoder(w).Encode(enrolledCourses)
 }
 
 // DeleteCourse maneja la eliminación de un curso por ID
@@ -243,4 +319,54 @@ func DeleteCourse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{"message": "Curso eliminado con éxito"})
+}
+
+// UnenrollUser maneja la desinscripción de un usuario de un curso
+func UnenrollUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extraer el ID del usuario desde el token
+	userID, err := getUserIDFromToken(r)
+	if err != nil {
+		log.Println("Error al obtener el ID del usuario:", err)
+		http.Error(w, "No se pudo obtener el ID del usuario", http.StatusUnauthorized)
+		return
+	}
+	log.Println("ID de usuario extraído:", userID)
+
+	// Obtener el `course_id` de los parámetros de la URL
+	courseID := r.URL.Query().Get("course_id")
+	if courseID == "" {
+		log.Println("ID del curso no proporcionado")
+		http.Error(w, "ID del curso no proporcionado", http.StatusBadRequest)
+		return
+	}
+	log.Println("ID del curso proporcionado:", courseID)
+
+	// Convertir `course_id` de cadena a `ObjectID`
+	objectID, err := primitive.ObjectIDFromHex(courseID)
+	if err != nil {
+		log.Println("ID del curso inválido:", err)
+		http.Error(w, "ID del curso inválido", http.StatusBadRequest)
+		return
+	}
+	log.Println("ObjectID del curso convertido correctamente:", objectID)
+
+	// Eliminar la inscripción de la base de datos
+	filter := bson.M{
+		"user_id":   userID,
+		"course_id": courseID, // Usa el `courseID` como una cadena si está almacenado como tal
+	}
+	result, err := db.MongoDB.Collection("enrollments").DeleteOne(context.TODO(), filter)
+	if err != nil || result.DeletedCount == 0 {
+		log.Println("Error al desinscribirse o inscripción no encontrada:", err)
+		http.Error(w, "Error al desinscribirse o inscripción no encontrada", http.StatusInternalServerError)
+		return
+	}
+
+	log.Println("Desinscripción exitosa para userID:", userID, "y courseID:", courseID)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Desinscripción exitosa"})
 }

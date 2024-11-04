@@ -68,8 +68,9 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var userID int
 	var storedPassword string
-	err := db.DB.QueryRow("SELECT password FROM users WHERE email = ?", creds.Email).Scan(&storedPassword)
+	err := db.DB.QueryRow("SELECT id, password FROM users WHERE email = ?", creds.Email).Scan(&userID, &storedPassword)
 	if err == sql.ErrNoRows {
 		http.Error(w, "Usuario no encontrado", http.StatusUnauthorized)
 		return
@@ -83,11 +84,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generar el token JWT
+	// Generar el token JWT con el userID
 	expirationTime := time.Now().Add(24 * time.Hour)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"email": creds.Email,
-		"exp":   expirationTime.Unix(),
+		"user_id": userID, // Incluye el user_id en las reclamaciones
+		"email":   creds.Email,
+		"exp":     expirationTime.Unix(),
 	})
 
 	tokenString, err := token.SignedString(jwtKey)
@@ -96,14 +98,14 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Establecer la cookie del token
+	log.Println("Token generado:", tokenString) // Imprime el token para depuración
+
 	http.SetCookie(w, &http.Cookie{
 		Name:    "token",
 		Value:   tokenString,
 		Expires: expirationTime,
 	})
 
-	// Responder con el token como JSON
 	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
 }
 
