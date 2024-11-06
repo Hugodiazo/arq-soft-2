@@ -1,11 +1,19 @@
-// src/pages/MyCourses.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import API_URL from '../config';
+import AuthContext from '../context/AuthContext';
 
 const MyCourses = () => {
   const [courses, setCourses] = useState([]);
+  const { isAuthenticated } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login'); // Redirigir al login si no está autenticado
+      return;
+    }
+
     const fetchMyCourses = async () => {
       try {
         const token = localStorage.getItem('token');
@@ -30,7 +38,7 @@ const MyCourses = () => {
     };
 
     fetchMyCourses();
-  }, []);
+  }, [isAuthenticated, navigate]);
 
   const handleUnenroll = async (courseId) => {
     try {
@@ -41,7 +49,7 @@ const MyCourses = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-  
+
       if (response.ok) {
         alert('Desinscripción exitosa');
         setCourses(courses.filter(course => course.id !== courseId)); // Actualiza los cursos

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/hugodiazo/arq-soft-2/api/courses"
+	"github.com/hugodiazo/arq-soft-2/api/middleware"
 	"github.com/hugodiazo/arq-soft-2/api/search"
 	"github.com/hugodiazo/arq-soft-2/api/users"
 	"github.com/hugodiazo/arq-soft-2/db"
@@ -37,7 +38,6 @@ func main() {
 
 	// Rutas del backend
 	mux.HandleFunc("/users", users.GetAllUsers)           // GET /users
-	mux.HandleFunc("/users/", users.GetUserByID)          // GET /users/{id}
 	mux.HandleFunc("/users/login", users.Login)           // POST /users/login
 	mux.HandleFunc("/users/register", users.RegisterUser) // POST /users/register
 	mux.HandleFunc("/users/update", users.UpdateUser)     // PUT /users
@@ -48,7 +48,7 @@ func main() {
 		case http.MethodGet:
 			courses.GetCourses(w, r)
 		case http.MethodPost:
-			courses.CreateCourse(w, r)
+			middleware.CheckRole("admin", courses.CreateCourse)(w, r) // Solo los administradores pueden crear cursos
 		default:
 			http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		}

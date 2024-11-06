@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/hugodiazo/arq-soft-2/api/users"
 	"github.com/hugodiazo/arq-soft-2/db"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -129,6 +130,21 @@ func CreateCourse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Obtener el ID del usuario desde el token
+	userID, err := getUserIDFromToken(r)
+	if err != nil {
+		http.Error(w, "No autorizado", http.StatusUnauthorized)
+		return
+	}
+
+	// Obtener el usuario desde la base de datos
+	user, err := users.GetUserByID(userID)
+	if err != nil || user.Role != "admin" {
+		http.Error(w, "No tienes permiso para crear un curso", http.StatusForbidden)
+		return
+	}
+
+	// Procesar la creación del curso
 	var course Course
 	if err := json.NewDecoder(r.Body).Decode(&course); err != nil {
 		http.Error(w, "Solicitud inválida", http.StatusBadRequest)
@@ -139,15 +155,15 @@ func CreateCourse(w http.ResponseWriter, r *http.Request) {
 	course.ID = primitive.NewObjectID()
 
 	// Insertar el curso en MongoDB
-	_, err := db.MongoDB.Collection("courses").InsertOne(context.TODO(), course)
+	_, err = db.MongoDB.Collection("courses").InsertOne(context.TODO(), course)
 	if err != nil {
 		http.Error(w, "Error al crear el curso", http.StatusInternalServerError)
 		return
 	}
 
-	// Convertir el ID a string para Solr
+	// Convertir el ID a string para Solr y limpiar el ObjectID si es necesario
 	stringID := course.ID.Hex()
-	course.ID = primitive.ObjectID{} // Limpiamos el ObjectID si es necesario para Solr
+	course.ID = primitive.ObjectID{}
 
 	// Indexar el curso en Solr
 	indexCourseInSolr(course, stringID)

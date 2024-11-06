@@ -1,0 +1,46 @@
+/* src/components/CreateCourse.css */
+.create-course {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .create-course h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+  }
+  
+  .create-course form {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .create-course input,
+  .create-course textarea,
+  .create-course select,
+  .create-course button {
+    margin-bottom: 15px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  
+  .create-course textarea {
+    resize: vertical;
+  }
+  
+  .create-course button {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  
+  .create-course button:hover {
+    background-color: #0056b3;
+  }

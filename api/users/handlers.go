@@ -3,6 +3,7 @@ package users
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -28,6 +29,21 @@ type Users struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Role     string `json:"role"`
+}
+
+// GetUserByID obtiene un usuario desde la base de datos por su ID
+func GetUserByID(userID int) (User, error) {
+	var user User
+	err := db.DB.QueryRow("SELECT id, name, email, role FROM users WHERE id = ?", userID).
+		Scan(&user.ID, &user.Name, &user.Email, &user.Role)
+	if err == sql.ErrNoRows {
+		return user, err // Usuario no encontrado
+	} else if err != nil {
+		log.Println("Error al obtener usuario:", err)
+		return user, err // Otro error
+	}
+
+	return user, nil
 }
 
 func RegisterUser(w http.ResponseWriter, r *http.Request) {
@@ -87,8 +103,8 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID int
-	var storedPassword string
-	err := db.DB.QueryRow("SELECT id, password FROM users WHERE email = ?", creds.Email).Scan(&userID, &storedPassword)
+	var storedPassword, userRole string // Agrega userRole aquí para obtener el rol
+	err := db.DB.QueryRow("SELECT id, password, role FROM users WHERE email = ?", creds.Email).Scan(&userID, &storedPassword, &userRole)
 	if err == sql.ErrNoRows {
 		http.Error(w, "Usuario no encontrado", http.StatusUnauthorized)
 		return
@@ -102,11 +118,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generar el token JWT con el userID
+	// Generar el token JWT con el userID y el rol
 	expirationTime := time.Now().Add(24 * time.Hour)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": userID, // Incluye el user_id en las reclamaciones
 		"email":   creds.Email,
+		"role":    userRole, // Ahora incluye el rol del usuario
 		"exp":     expirationTime.Unix(),
 	})
 
@@ -159,36 +176,6 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(users)
 }
 
-// GetUserByID maneja la obtención de un usuario por ID
-func GetUserByID(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Extraer el ID del usuario desde la URL
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 3 {
-		http.Error(w, "ID de usuario no proporcionado", http.StatusBadRequest)
-		return
-	}
-	userID := parts[2]
-
-	var user User
-	err := db.DB.QueryRow("SELECT id, name, email, role FROM users WHERE id = ?", userID).
-		Scan(&user.ID, &user.Name, &user.Email, &user.Role)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Usuario no encontrado", http.StatusNotFound)
-		return
-	} else if err != nil {
-		log.Println("Error al obtener usuario:", err)
-		http.Error(w, "Error interno del servidor", http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(user)
-}
-
 // UpdateUser maneja la actualización de un usuario
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
@@ -211,4 +198,48 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{"message": "Usuario actualizado con éxito"})
+}
+
+func GetUserIDFromToken(r *http.Request) (int, error) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return 0, fmt.Errorf("token no proporcionado")
+	}
+
+	// Extraer el token
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
+	// Parsear el token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("método de firma inesperado: %v", token.Header["alg"])
+		}
+		return jwtKey, nil
+	})
+	if err != nil || !token.Valid {
+		return 0, fmt.Errorf("token inválido")
+	}
+
+	// Extraer las reclamaciones
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		userID, ok := claims["user_id"].(float64)
+		if !ok {
+			return 0, fmt.Errorf("ID de usuario no encontrado en el token")
+		}
+		return int(userID), nil
+	}
+	return 0, fmt.Errorf("no se pudieron obtener las reclamaciones del token")
+}
+
+// Obtener un usuario por ID desde la base de datos
+func GetUserByIDFromDB(userID int) (User, error) {
+	var user User
+	err := db.DB.QueryRow("SELECT id, name, email, role FROM users WHERE id = ?", userID).
+		Scan(&user.ID, &user.Name, &user.Email, &user.Role)
+	if err == sql.ErrNoRows {
+		return user, fmt.Errorf("usuario no encontrado")
+	} else if err != nil {
+		return user, err
+	}
+	return user, nil
 }
